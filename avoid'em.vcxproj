@@ -24,6 +24,7 @@
     <ProjectGuid>{e1820ddf-5554-47e2-a9bf-9b6140ef9bc6}</ProjectGuid>
     <RootNamespace>avoid_em</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>breakout</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

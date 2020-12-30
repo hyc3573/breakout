@@ -1,198 +1,70 @@
 #include <SFML/Graphics.hpp>
-#include <deque>
-#include <utility>
-#include <iterator>
 #include <iostream>
-#include <vector>
 #include <cstdlib>
 #include <Windows.h>
 
-#define SNAKE 1
-#define APPLE 2
-#define EMPTY 0
-#define ILLEGAL 3
+#define SWIDTH 800
+#define SHEIGHT 800
 
-#define BWIDTH 100
-#define BHEIGHT 100
-#define BMARGIN 2 // px
+#define PWIDTH 60
+#define PHEIGHT 10
 
-#define SWIDTH 1000
-#define SHEIGHT 1000
+#define BWIDTH 20
+#define BHEIGHT 14
 
-#define DIED 2
-#define GROWN 1
-#define NOTHING 0
+#define BMARGIN 5
+#define PMARGIN 10
 
-#define SPEED .25f // second per move
+#define BLRAD 5
+#define BLMARGIN 50
+
+#define PI 3.1415926
 
 typedef int Square;
 
 using namespace std;
 using namespace sf;
 
-class Board
-{
-private:
-    Square board[BWIDTH][BHEIGHT];
-
-public:
-    Board() : board{ 0 } {};
-
-    bool isLegal(int X, int Y)
-    {
-        return 0 <= X && X < BWIDTH && 0 <= Y && Y < BHEIGHT;
-    }
-
-    Square getSquare(int X, int Y)
-    {
-        return board[X][Y];
-    }
-
-    void setSquare(int X, int Y, Square value)
-    {
-        board[X][Y] = value;
-    }
-};
-
-class Snake
-{
-private:
-    deque<pair<int, int>> body; // first element is head, last element is tail
-    int dirX;
-    int dirY;
-    Board &board;
-
-public:
-    Snake(int X, int Y, Board& board, int length = 5) : dirX(1), dirY(0), board(board)
-    {
-        for (int i = 0;i < length;i++)
-        {
-            board.setSquare(X + dirX * i, Y + dirY * i, SNAKE);
-            body.push_front(pair<int, int>(X + dirX * i, Y + dirY * i));
-        }
-    }
-    
-    Snake(Board& board) : dirX(1), dirY(0), body(deque<pair<int, int>>()), board(board) {};
-
-    Snake(const Snake& lhs) : dirX(lhs.dirX), dirY(lhs.dirY), board(lhs.board), body(lhs.body) {};
-
-    Snake& operator=(const Snake& lhs)
-    {
-        dirX = lhs.dirX;
-        dirY = lhs.dirY;
-        board = lhs.board;
-        body = lhs.body;
-        return *this;
-    }
-
-    auto getBody()
-    {
-        return begin(body);
-    }
-
-    auto getHead()
-    {
-        return body.front();
-    }
-
-    int move()
-    {
-        auto head = body.front();
-        auto tail = body.back();
-        int goalX = head.first + dirX;
-        int goalY = head.second + dirY;
-        bool grow = false;
-
-        if (not board.isLegal(goalX, goalY))
-        {
-            return DIED;
-        }
-
-        Square element = board.getSquare(goalX, goalY);
-        if (element == SNAKE)
-        {
-            return DIED;
-        }
-
-        grow = element == APPLE;
-
-        body.push_front(pair<int, int>(goalX, goalY));
-        board.setSquare(goalX, goalY, SNAKE);
-
-        if (not grow)
-        {
-            body.pop_back();
-            board.setSquare(tail.first, tail.second, EMPTY);
-            return NOTHING;
-        }
-        return GROWN;
-    }
-
-    void setXdir(int value)
-    {
-        dirX = value;
-        dirY = 0;
-    }
-
-    void setYdir(int value)
-    {
-        dirY = value;
-        dirX = 0;
-    }
-};
-
-void newApple(Board& board)
-{
-    int i = 0;
-    int j = 0;
-
-    do
-    {
-        i = rand() % BWIDTH;
-        j = rand() % BHEIGHT;
-    } while (board.getSquare(i, j) != EMPTY);
-
-    board.setSquare(i, j, APPLE);
-}
-
-void reset(Board& board, Snake& snake)
-{
-    board = Board();
-    snake = Snake(5, BHEIGHT / 2 + 1, board);
-    newApple(board);
-}
-
 int main()
 {
     unsigned int t = GetTickCount64();
     srand(t);
 
-    RenderWindow window(VideoMode(SWIDTH, SHEIGHT), L"Å©°í¡Î¾Æ¸§´Ù¿î¡Î°ÔÀÌ¤±");
+    RenderWindow window(VideoMode(SWIDTH, SHEIGHT), L"È¥µ·! ÆÄ±«! ¸Á°¡¤¡!");
 
     Event event;
 
-    Board board;
-    Snake snake(board);
-    reset(board, snake);
-
     Clock clock;
 
-    int result = 0;
+    RectangleShape paddle = RectangleShape(Vector2f(PWIDTH, PHEIGHT));
+    paddle.setFillColor(Color::White);
+    paddle.setOrigin(PWIDTH / 2, PHEIGHT / 2);
 
-    vector<vector<RectangleShape>> squares = vector<vector<RectangleShape>>(BWIDTH, vector<RectangleShape>(BHEIGHT, RectangleShape()));
-    for (int i = 0;i < BWIDTH;i++)
+    CircleShape ball = CircleShape(BLRAD);
+    ball.setFillColor(Color::White);
+    ball.setOrigin(BLRAD, BLRAD);
+
+    float direction;
+    float bSpeed;
+
+    int movement;
+    float speed;
+
+    float dt = 0;
+
+    auto reset = [&]()
     {
-        for (int j = 0;j < BHEIGHT;j++)
-        {
-            squares[i][j] = RectangleShape(Vector2f(SWIDTH / BWIDTH, SHEIGHT / BHEIGHT));
-            squares[i][j].setFillColor(Color::Black);
-            squares[i][j].setOutlineColor(Color::White);
-            squares[i][j].setOutlineThickness(BMARGIN / 2);
-            squares[i][j].setPosition(SWIDTH / BWIDTH * i, SHEIGHT / BHEIGHT * j);
-        }
-    }
+        ball.setPosition(SWIDTH / 2, SHEIGHT - PMARGIN - BLMARGIN);
+        paddle.setPosition(SWIDTH / 2, SHEIGHT - PMARGIN);
 
-    Color colorTheme[3] = { Color::Black, Color::Green, Color::Red }; // empty, snake, apple
+        direction = (rand() % 90 + 135) * PI / 180;
+        bSpeed = 500.f;
+
+        movement = 0;
+        speed = 500.f;
+    }; // Á¸³ª ÁÁ±º?
+
+    reset();
 
     while (window.isOpen()) 
     {
@@ -207,50 +79,63 @@ int main()
             case Event::KeyPressed:
                 switch (event.key.code)
                 {
-                case Keyboard::W:
-                    snake.setYdir(-1);
+                case Keyboard::Left:
+                    movement = -1;
                     break;
-                case Keyboard::S:
-                    snake.setYdir(1);
-                    break;
-                case Keyboard::A:
-                    snake.setXdir(-1);
-                    break;
-                case Keyboard::D:
-                    snake.setXdir(1);
+                case Keyboard::Right:
+                    movement = 1;
                     break;
                 }
                 break;
 
             case Event::KeyReleased:
+                switch (event.key.code)
+                {
+                case Keyboard::Left:
+                    if (movement == -1)
+                    {
+                        movement = 0;
+                    }
+                    break;
+                case Keyboard::Right:
+                    if (movement == 1)
+                    {
+                        movement = 0;
+                    }
+                    break;
+                }
                 break;
             }
         }
 
-        if (clock.getElapsedTime().asSeconds() > SPEED)
+        if (ball.getPosition().x <= BLRAD || ball.getPosition().x >= SWIDTH - BLRAD)
         {
-            clock.restart();
-            result = snake.move();
-
-            switch (result)
-            {
-            case DIED:
-                reset(board, snake);
-                break;
-
-            case GROWN:
-                newApple(board);
-            }
+            direction = 2 * PI - direction;
         }
 
-        for (int i = 0;i < BWIDTH;i++)
+        if (ball.getPosition().y <= BLRAD || paddle.getGlobalBounds().intersects(ball.getGlobalBounds()))
         {
-            for (int j = 0;j < BHEIGHT;j++)
-            {
-                squares[i][j].setFillColor(colorTheme[board.getSquare(i, j)]);
-                window.draw(squares[i][j]);
-            }
+            direction = PI - direction;
         }
+
+        if (ball.getPosition().y >= SHEIGHT - BLRAD)
+        {
+            reset();
+        }
+
+        dt = clock.getElapsedTime().asSeconds();
+        clock.restart();
+
+        paddle.move(movement * speed * dt, 0);
+        paddle.setPosition(max(min(paddle.getPosition().x, (float)SWIDTH - PWIDTH / 2), 0.f + PWIDTH / 2), paddle.getPosition().y);
+
+        ball.move(sin(direction) * bSpeed * dt, cos(direction) * bSpeed * dt);
+
+        window.clear(Color::Black);
+
+        window.draw(paddle);
+        window.draw(ball);
+
         window.display();
     }
     return 0;
